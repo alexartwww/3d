@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"runtime"
 
@@ -14,19 +13,21 @@ type Point3D struct {
 }
 
 var (
-	width       = 800
-	height      = 600
-	perspective = true
-	e           = 300.0
-	ox, oy, oz  float64
-	sinTable    [360]float64
-	cosTable    [360]float64
+	width        = 800
+	height       = 600
+	perspective  = true
+	e            = 300.0
+	ox, oy, oz   float64
+	scale        = 1.0
+	lastX, lastY float64
+	isDragging   bool
+	sinTable     [360]float64
+	cosTable     [360]float64
 )
 
 func init() {
 	runtime.LockOSThread()
 
-	// Предварительно вычисляем таблицы синусов и косинусов
 	for i := 0; i < 360; i++ {
 		rad := float64(i) * math.Pi / 180
 		sinTable[i] = math.Sin(rad)
@@ -42,7 +43,7 @@ func main() {
 
 	glfw.WindowHint(glfw.ContextVersionMajor, 2)
 	glfw.WindowHint(glfw.ContextVersionMinor, 1)
-	window, err := glfw.CreateWindow(width, height, "3D Cube Rotation", nil, nil)
+	window, err := glfw.CreateWindow(width, height, "3D Cube with Mouse Control", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -60,15 +61,21 @@ func main() {
 	gl.Ortho(0, float64(width), float64(height), 0, -1, 1)
 	gl.MatrixMode(gl.MODELVIEW)
 
+	// Настройка обработчиков
 	window.SetKeyCallback(keyCallback)
+	window.SetCursorPosCallback(mouseMoveCallback)
+	window.SetMouseButtonCallback(mouseButtonCallback)
+	window.SetScrollCallback(mouseScrollCallback)
 
 	for !window.ShouldClose() {
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
-		// Рисуем куб
-		drawCube()
+		gl.LoadIdentity()
+		gl.Translated(float64(width)/2, float64(height)/2, 0)
+		gl.Scaled(scale, scale, scale)
+		gl.Translated(-float64(width)/2, -float64(height)/2, 0)
 
-		// Рисуем оси координат
+		drawCube()
 		drawAxes()
 
 		window.SwapBuffers()
@@ -168,38 +175,51 @@ func drawAxes() {
 }
 
 func keyCallback(window *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
-	if action == glfw.Press || action == glfw.Repeat {
-		switch key {
-		case glfw.KeyQ:
-			ox -= 1
-		case glfw.KeyA:
-			ox += 1
-		case glfw.KeyW:
-			oy -= 1
-		case glfw.KeyS:
-			oy += 1
-		case glfw.KeyE:
-			oz -= 1
-		case glfw.KeyD:
-			oz += 1
-		case glfw.KeyEscape:
-			window.SetShouldClose(true)
+	if action == glfw.Press && key == glfw.KeyEscape {
+		window.SetShouldClose(true)
+	}
+}
+
+func mouseButtonCallback(window *glfw.Window, button glfw.MouseButton, action glfw.Action, mod glfw.ModifierKey) {
+	if button == glfw.MouseButtonLeft {
+		isDragging = (action == glfw.Press)
+		lastX, lastY = window.GetCursorPos() // Правильный способ получения позиции
+	}
+}
+
+func mouseMoveCallback(window *glfw.Window, xpos, ypos float64) {
+	if isDragging {
+		dx := xpos - lastX
+		dy := ypos - lastY
+
+		// Чувствительность вращения
+		oz -= dx * 0.5
+		oy -= dy * 0.5
+
+		lastX, lastY = xpos, ypos
+
+		// Нормализация углов
+		ox = math.Mod(ox, 360)
+		oy = math.Mod(oy, 360)
+		if ox < 0 {
+			ox += 360
+		}
+		if oy < 0 {
+			oy += 360
+		}
+		if oz < 0 {
+			oz += 360
 		}
 	}
+}
 
-	// Нормализация углов
-	ox = math.Mod(ox, 360)
-	if ox < 0 {
-		ox += 360
+func mouseScrollCallback(window *glfw.Window, xoff, yoff float64) {
+	// Масштабирование колесиком мыши
+	scale += yoff * 0.1
+	if scale < 0.1 {
+		scale = 0.1
 	}
-	oy = math.Mod(oy, 360)
-	if oy < 0 {
-		oy += 360
+	if scale > 3.0 {
+		scale = 3.0
 	}
-	oz = math.Mod(oz, 360)
-	if oz < 0 {
-		oz += 360
-	}
-
-	fmt.Printf("Rotation: X=%.1f, Y=%.1f, Z=%.1f\n", ox, oy, oz)
 }
