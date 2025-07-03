@@ -210,6 +210,15 @@ func mouseMoveCallback(window *glfw.Window, xpos, ypos float64) {
 		if oz < 0 {
 			oz += 360
 		}
+		//if ox > 359 {
+		//	ox -= 359
+		//}
+		//if oy > 359 {
+		//	oy -= 359
+		//}
+		//if oz > 359 {
+		//	oz -= 359
+		//}
 	}
 }
 
